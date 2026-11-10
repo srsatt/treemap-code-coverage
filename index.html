@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1e1f22">
+<title>Coverage map</title>
+<script>
+try {
+  const theme = localStorage.getItem('coverage-theme');
+  if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+} catch {}
+</script>
+<link rel="stylesheet" href="styles.css">
+<script type="module" src="src/app.js"></script>
+</head>
+<body>
+<header class="top">
+  <h1>Coverage</h1>
+  <span id="report-meta" class="meta"></span>
+  <span class="grow"></span>
+  <input id="search" class="search" type="search" name="q" aria-label="Filter files" placeholder="Filter files…" autocomplete="off" spellcheck="false" hidden>
+  <button id="theme" class="icon-btn" type="button" data-mode="system" aria-label="Theme: system">
+    <svg class="i-system" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.75" y="2.5" width="12.5" height="8.5" rx="1.25"/><path d="M5.5 14h5M8 11v3"/></svg>
+    <svg class="i-light" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="2.75"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.05 1.05M11.55 11.55l1.05 1.05M3.4 12.6l1.05-1.05M11.55 4.45l1.05-1.05"/></svg>
+    <svg class="i-dark" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.25 9.6A5.5 5.5 0 0 1 6.4 2.75a5.5 5.5 0 1 0 6.85 6.85Z"/></svg>
+  </button>
+  <button id="open" class="btn" type="button">Open report…</button>
+  <input id="file" type="file" accept=".json,application/json" hidden>
+</header>
+
+<div id="start" class="start" hidden>
+  <div class="start-box">
+    <h2>Open an Istanbul report</h2>
+    <p>Choose <code>coverage-final.json</code> or <code>coverage-summary.json</code>, or drop it on this page.</p>
+    <p id="error" class="error" role="alert" hidden></p>
+    <button id="open-start" class="btn primary" type="button">Open report…</button>
+  </div>
+</div>
+
+<main id="main" class="main" hidden>
+  <div class="toolbar">
+    <div id="tabs" class="tabs" role="group" aria-label="Metric"></div>
+    <span class="grow"></span>
+    <div id="filters" class="filters" role="group" aria-label="Show files by coverage"></div>
+  </div>
+  <div class="split">
+    <section class="map-pane" aria-label="Coverage map">
+      <nav id="crumbs" class="crumbs" aria-label="Folder"></nav>
+      <div class="map-wrap"><div id="map" class="map" translate="no"></div></div>
+    </section>
+    <aside id="panel" class="panel" aria-label="Details" aria-live="polite"></aside>
+  </div>
+</main>
+
+<dialog id="source" class="source" aria-labelledby="source-title">
+  <div class="source-head">
+    <h2 id="source-title" class="source-title" translate="no"></h2>
+    <span id="source-stats" class="source-stats"></span>
+    <div class="source-nav">
+      <span id="source-blocks" class="source-stats"></span>
+      <button id="prev-miss" class="btn" type="button">Previous uncovered</button>
+      <button id="next-miss" class="btn" type="button">Next uncovered</button>
+      <button id="source-close" class="btn" type="button">Close</button>
+    </div>
+  </div>
+  <div id="code-scroll" class="code-scroll" tabindex="0" autofocus role="region" aria-label="Source">
+    <div class="code-grid" translate="no"><div id="gutter" class="gutter" aria-hidden="true"></div><pre class="code"><code id="code"></code></pre></div>
+  </div>
+</dialog>
+
+<div id="tip" class="tip" popover="manual" aria-hidden="true" translate="no"></div>
+</body>
+</html>
