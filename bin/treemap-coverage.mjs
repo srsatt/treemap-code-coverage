@@ -20,6 +20,7 @@ Options:
                    current directory; report paths elsewhere are looked up under it by their
                    path in the tree. Default: the current directory.
   --no-sources     Skip the source preview.
+  --export <file>  Write one self-contained HTML file with the report and sources, then exit.
   --port <number>  Port to listen on. Default: 4173.
   --open           Open the browser.
   -h, --help       Show this help.
@@ -31,7 +32,7 @@ try {
   parsed = parseArgs({
     allowPositionals: true,
     options: {
-      root: {type: 'string'}, port: {type: 'string', default: '4173'}, open: {type: 'boolean', default: false},
+      root: {type: 'string'}, export: {type: 'string'}, port: {type: 'string', default: '4173'}, open: {type: 'boolean', default: false},
       'no-sources': {type: 'boolean', default: false}, help: {type: 'boolean', short: 'h'}, version: {type: 'boolean', short: 'v'},
     },
   });
@@ -76,6 +77,12 @@ try {
 }
 
 let sourcesDir = null;
+const cleanup = (code = 0) => {
+  if (sourcesDir) rmSync(sourcesDir, {recursive: true, force: true});
+  process.exit(code);
+};
+process.on('SIGINT', () => cleanup(130));
+process.on('SIGTERM', () => cleanup(143));
 if (!values['no-sources']) {
   const {buildSources} = await import('../lib/build-sources.mjs');
   sourcesDir = mkdtempSync(path.join(tmpdir(), 'treemap-coverage-'));
@@ -90,6 +97,23 @@ if (!values['no-sources']) {
   }
   const {count, skipped} = result;
   console.log(`Sources: ${count} highlighted, ${skipped.missing} not found, ${skipped.large} too large`);
+}
+
+if (values.export !== undefined) {
+  if (!values.export) {
+    console.error('--export needs a file path.');
+    cleanup(2);
+  }
+  const {exportHtml} = await import('../lib/export.mjs');
+  const target = path.resolve(values.export);
+  try {
+    const size = exportHtml({reportPath, sourcesDir, out: target, name: path.basename(reportPath), dist});
+    process.stdout.write(`Wrote ${target} (${(size / 1024 / 1024).toFixed(1)} MB)\n`, () => cleanup(0));
+  } catch (error) {
+    console.error(`Could not write ${target}: ${error.message}`);
+    cleanup(1);
+  }
+  await new Promise(() => {});
 }
 
 const types = {
@@ -125,12 +149,6 @@ const server = createServer((request, response) => {
   createReadStream(file).on('error', () => response.destroy()).pipe(response);
 });
 
-const cleanup = (code = 0) => {
-  if (sourcesDir) rmSync(sourcesDir, {recursive: true, force: true});
-  process.exit(code);
-};
-process.on('SIGINT', () => cleanup(0));
-process.on('SIGTERM', () => cleanup(0));
 
 server.on('error', error => {
   console.error(error.code === 'EADDRINUSE' ? `Port ${port} is in use. Pass --port.` : error.message);

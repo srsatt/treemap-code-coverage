@@ -102,9 +102,27 @@ function load(json, fileName) {
   loadSourceIndex();
 }
 
+let embeddedSources = null;
+
+function readEmbedded() {
+  const node = document.getElementById('embedded');
+  if (!node) return null;
+  try {
+    const data = JSON.parse(node.textContent);
+    return data !== null && typeof data === 'object' ? data : null;
+  } catch {
+    return null;
+  }
+}
+
 async function loadSourceIndex() {
   const tree = state.tree;
   state.sources = new Set();
+  if (embeddedSources) {
+    state.sources = new Set(Object.keys(embeddedSources));
+    renderPanel(tree.index.get(state.zoom) ?? tree.root);
+    return;
+  }
   try {
     const response = await fetch('sources/_index.json');
     if (response.ok && state.tree === tree) state.sources = new Set(await response.json());
@@ -113,6 +131,7 @@ async function loadSourceIndex() {
 }
 
 async function loadFile(file) {
+  embeddedSources = null;
   try {
     load(JSON.parse(await file.text()), file.name);
   } catch (error) {
@@ -121,12 +140,24 @@ async function loadFile(file) {
 }
 
 async function loadUrl(url) {
+  embeddedSources = null;
   const response = await fetch(url);
   if (!response.ok) throw new Error(`${url}: ${response.status}`);
   load(await response.json(), url.split('/').at(-1));
 }
 
 async function autoLoad() {
+  const embedded = readEmbedded();
+  if (embedded) {
+    embeddedSources = embedded.sources ?? {};
+    try {
+      load(embedded.report, embedded.name ?? 'coverage');
+    } catch (error) {
+      embeddedSources = null;
+      showStart(error.message);
+    }
+    return;
+  }
   const explicit = new URLSearchParams(location.search).get('data');
   if (explicit && new URL(explicit, location.href).origin !== location.origin) {
     showStart('?data= must point to a file on this site.');
@@ -465,9 +496,12 @@ async function openSource(node) {
   if (!el.dialog.open) el.dialog.showModal();
   el.codeScroll.scrollTo({top: 0});
   try {
-    const response = await fetch(`sources/${node.path.split('/').map(encodeURIComponent).join('/')}.json`);
-    if (!response.ok) throw new Error(String(response.status));
-    const data = await response.json();
+    let data = embeddedSources && Object.hasOwn(embeddedSources, node.path) ? embeddedSources[node.path] : null;
+    if (!data) {
+      const response = await fetch(`sources/${node.path.split('/').map(encodeURIComponent).join('/')}.json`);
+      if (!response.ok) throw new Error(String(response.status));
+      data = await response.json();
+    }
     if (state.sourceNode !== node) return;
     const rows = data.text.split('\n');
     if (rows.length > 1 && rows.at(-1) === '') rows.pop();
@@ -483,7 +517,7 @@ async function openSource(node) {
     [el.prevMiss, el.nextMiss].forEach(button => (button.hidden = blocks.length === 0));
   } catch {
     if (state.sourceNode !== node) return;
-    el.code.textContent = `Could not load the source of ${node.path}. Run npm run build:sources again.`;
+    el.code.textContent = `Could not load the source of ${node.path}.`;
   }
 }
 
