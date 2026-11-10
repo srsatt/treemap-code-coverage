@@ -1,4 +1,4 @@
-# @srsatt/treemap-code-coverage
+# treemap-code-coverage
 
 Treemap viewer for [Istanbul](https://istanbul.js.org/) coverage reports. Tiles are files sized by lines and colored by the selected metric; folders zoom in on click. Double-click a file to read its source with hit counts and uncovered lines marked.
 
@@ -15,13 +15,13 @@ The first two screenshots show a mock report built from the design reference (`m
 ## Install
 
 ```sh
-npm install --save-dev @srsatt/treemap-code-coverage
+npm install --save-dev treemap-code-coverage
 ```
 
 ## Use
 
 ```sh
-npx treemap-coverage coverage/coverage-final.json
+npx treemap-code-coverage coverage/coverage-final.json
 ```
 
 | Option | Description |
@@ -70,13 +70,13 @@ npm run build:sources -- public/coverage-final.json --root <dir shown as the tre
 Publishing to npm runs in GitHub Actions; no npm token is stored on a local machine.
 
 1. Set `version` in `package.json` and merge it to `main`.
-2. Create a GitHub release with the tag `v<version>`, for example `v0.1.0`.
+2. Create a GitHub release with the tag `v<version>`, for example `v0.1.1`.
 
 The `Publish` workflow checks that the tag matches `version`, builds the viewer and runs `npm publish --provenance`, which links the package to the commit and workflow run that built it.
 
 Authentication: npm only accepts a trusted publisher for a package that already exists, so the first release uses a token.
 
-1. Create a granular npm token (read and write, only for this package or the `@srsatt` scope) and save it as the repository secret `NPM_TOKEN`.
+1. Create a granular npm token (read and write, with two-factor bypass) and save it as the repository secret `NPM_TOKEN`.
 2. After the first release, open the package on npmjs.com → Settings → Trusted Publisher and add GitHub Actions with repository `srsatt/treemap-code-coverage` and workflow `publish.yml`.
 3. Delete the `NPM_TOKEN` secret and revoke the token. Later releases authenticate through GitHub's OIDC identity.
 
