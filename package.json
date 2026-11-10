@@ -1,0 +1,52 @@
+{
+  "name": "@srsatt/treemap-code-coverage",
+  "version": "0.1.0",
+  "description": "Treemap viewer for Istanbul coverage reports, with highlighted source preview.",
+  "keywords": [
+    "coverage",
+    "istanbul",
+    "treemap",
+    "visualization",
+    "code-coverage",
+    "nyc",
+    "vitest"
+  ],
+  "license": "EUPL-1.2",
+  "author": "srsatt",
+  "homepage": "https://github.com/srsatt/treemap-code-coverage#readme",
+  "bugs": "https://github.com/srsatt/treemap-code-coverage/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/srsatt/treemap-code-coverage.git"
+  },
+  "type": "module",
+  "bin": {
+    "treemap-coverage": "bin/treemap-coverage.mjs"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "lib",
+    "src/istanbul.js"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "build:sources": "node tools/build-sources.mjs",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "jsdom": "^26.0.0",
+    "microlighter": "^2.2.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.7"
+  }
+}
