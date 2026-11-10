@@ -1,6 +1,6 @@
 {
   "name": "treemap-code-coverage",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Treemap viewer for Istanbul coverage reports, with highlighted source preview.",
   "keywords": [
     "coverage",
