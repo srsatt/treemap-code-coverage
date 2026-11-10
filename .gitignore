@@ -4,3 +4,4 @@ public/sources/
 public/sample/
 public/coverage-final.json
 public/coverage-summary.json
+.env

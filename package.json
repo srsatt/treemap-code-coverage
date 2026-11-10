@@ -1,6 +1,6 @@
 {
-  "name": "@srsatt/treemap-code-coverage",
-  "version": "0.1.0",
+  "name": "treemap-code-coverage",
+  "version": "0.1.1",
   "description": "Treemap viewer for Istanbul coverage reports, with highlighted source preview.",
   "keywords": [
     "coverage",
@@ -21,6 +21,7 @@
   },
   "type": "module",
   "bin": {
+    "treemap-code-coverage": "bin/treemap-coverage.mjs",
     "treemap-coverage": "bin/treemap-coverage.mjs"
   },
   "files": [
