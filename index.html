@@ -21,6 +21,10 @@ try {
   <h1>Coverage</h1>
   <span id="report-meta" class="meta"></span>
   <span class="grow"></span>
+  <div id="views" class="views" role="group" aria-label="View" hidden>
+    <button type="button" class="view" data-view="treemap" aria-pressed="true">Treemap</button>
+    <button type="button" class="view" data-view="list" aria-pressed="false">List</button>
+  </div>
   <input id="search" class="search" type="search" name="q" aria-label="Filter files" placeholder="Filter files…" autocomplete="off" spellcheck="false" hidden>
   <button id="theme" class="icon-btn" type="button" data-mode="system" aria-label="Theme: system">
     <svg class="i-system" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.75" y="2.5" width="12.5" height="8.5" rx="1.25"/><path d="M5.5 14h5M8 11v3"/></svg>
@@ -41,18 +45,35 @@ try {
 </div>
 
 <main id="main" class="main" hidden>
-  <div class="toolbar">
+  <div id="toolbar" class="toolbar">
     <div id="tabs" class="tabs" role="group" aria-label="Metric"></div>
     <span class="grow"></span>
     <div id="filters" class="filters" role="group" aria-label="Show files by coverage"></div>
   </div>
-  <div class="split">
+  <div id="split" class="split">
     <section class="map-pane" aria-label="Coverage map">
       <nav id="crumbs" class="crumbs" aria-label="Folder"></nav>
       <div class="map-wrap"><div id="map" class="map" translate="no"></div></div>
     </section>
     <aside id="panel" class="panel" aria-label="Details" aria-live="polite"></aside>
   </div>
+  <section id="files" class="files-view" aria-label="Files" hidden>
+    <div class="files-bar"><span id="files-count" class="meta" aria-live="polite"></span></div>
+    <div class="files-scroll">
+      <table class="files">
+        <thead>
+          <tr>
+            <th scope="col" data-sort="file"><button type="button" class="sort">File</button></th>
+            <th scope="col" data-sort="st"><button type="button" class="sort">Statements</button></th>
+            <th scope="col" data-sort="br"><button type="button" class="sort">Branches</button></th>
+            <th scope="col" data-sort="fn"><button type="button" class="sort">Functions</button></th>
+            <th scope="col" data-sort="ln"><button type="button" class="sort">Lines</button></th>
+          </tr>
+        </thead>
+        <tbody id="files-body"></tbody>
+      </table>
+    </div>
+  </section>
 </main>
 
 <dialog id="source" class="source" aria-labelledby="source-title">

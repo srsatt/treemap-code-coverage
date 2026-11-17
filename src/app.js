@@ -20,7 +20,9 @@ const el = {
   theme: $('theme'), dialog: $('source'), sourceTitle: $('source-title'), sourceStats: $('source-stats'),
   sourceBlocks: $('source-blocks'), prevMiss: $('prev-miss'), nextMiss: $('next-miss'), sourceClose: $('source-close'),
   codeScroll: $('code-scroll'), gutter: $('gutter'), code: $('code'),
+  views: $('views'), toolbar: $('toolbar'), split: $('split'), files: $('files'), filesCount: $('files-count'), filesBody: $('files-body'),
 };
+const sortHeads = [...el.files.querySelectorAll('th[data-sort]')];
 
 const LINE_HEIGHT = 20;
 const THEME_KEY = 'coverage-theme';
@@ -28,6 +30,9 @@ const THEME_KEY = 'coverage-theme';
 const state = {
   tree: null,
   metric: 'ln',
+  view: 'treemap',
+  rows: [],
+  sort: {key: 'ln', direction: 1},
   zoom: '',
   selected: '',
   query: '',
@@ -79,6 +84,7 @@ function showStart(message) {
   el.start.hidden = false;
   el.main.hidden = true;
   el.search.hidden = true;
+  el.views.hidden = true;
   el.meta.textContent = '';
   el.error.hidden = !message;
   el.error.textContent = message ?? '';
@@ -95,7 +101,9 @@ function load(json, fileName) {
   el.start.hidden = true;
   el.main.hidden = false;
   el.search.hidden = false;
+  el.views.hidden = false;
   const root = state.tree.root;
+  state.rows = leaves(root).map(node => ({node, lower: node.path.toLowerCase(), cells: fileCells(node)}));
   el.meta.textContent = `${fileName} · ${fmt(root.fileCount)} files${report.hasDetail ? '' : ' · summary only'}`;
   readHash();
   render();
@@ -184,6 +192,7 @@ function readHash() {
   const params = new URLSearchParams(location.hash.slice(1));
   const metric = params.get('m');
   state.metric = METRICS.some(m => m.key === metric) ? metric : 'ln';
+  state.view = params.get('v') === 'list' ? 'list' : 'treemap';
   const index = state.tree?.index;
   const zoom = params.get('z') ?? '';
   const selected = params.get('s') ?? '';
@@ -191,14 +200,19 @@ function readHash() {
   state.selected = index?.has(selected) ? selected : '';
 }
 
-function go(next, focus = null) {
-  const merged = {metric: state.metric, zoom: state.zoom, selected: state.selected, ...next};
+function hashOf(next) {
+  const merged = {metric: state.metric, view: state.view, zoom: state.zoom, selected: state.selected, ...next};
   const params = new URLSearchParams();
+  if (merged.view === 'list') params.set('v', 'list');
   if (merged.metric !== 'ln') params.set('m', merged.metric);
   if (merged.zoom) params.set('z', merged.zoom);
   if (merged.selected) params.set('s', merged.selected);
+  return params.toString();
+}
+
+function go(next, focus = null) {
   state.focus = focus;
-  const hash = params.toString();
+  const hash = hashOf(next);
   if (hash === location.hash.slice(1)) {
     readHash();
     render();
@@ -354,8 +368,64 @@ function metricRow(node, key, label, active) {
   return `<div class="row"><span class="label${active ? ' on' : ''}">${label}</span>${bar(p, cls)}<span class="v">${pctText(p)}</span><span class="c">${fmt(m.covered)} / ${fmt(m.total)}</span></div>`;
 }
 
+function fileCells(node) {
+  return METRICS.map(({key}) => {
+    const m = node.metrics[key];
+    const p = percent(m);
+    return `<td><span class="bar"><i class="${classify(node, key)}" style="width:${p ?? 0}%"></i></span><span class="v">${pctText(p)}</span><span class="c">${fmt(m.covered)}/${fmt(m.total)}</span></td>`;
+  }).join('');
+}
+
+function sortValue(node, key) {
+  return key === 'file' ? node.path : (percent(node.metrics[key]) ?? 100);
+}
+
+const ROW_CHUNK = 250;
+let filesFrame = 0;
+
+function renderFiles() {
+  const {key, direction} = state.sort;
+  const query = state.query.trim().toLowerCase();
+  const visible = state.rows.filter(row => row.lower.includes(query));
+  visible.sort((a, b) => {
+    const [left, right] = [sortValue(a.node, key), sortValue(b.node, key)];
+    return (left < right ? -1 : left > right ? 1 : a.node.path.localeCompare(b.node.path)) * direction;
+  });
+  cancelAnimationFrame(filesFrame);
+  const rowHtml = ({node, cells}) =>
+    `<tr><td class="file"><a href="#${escapeHtml(hashOf({view: 'treemap', zoom: node.parent.path, selected: node.path}))}" data-open="${escapeHtml(node.path)}">${escapeHtml(node.path)}</a></td>${cells}</tr>`;
+  el.filesBody.innerHTML = visible.length ? visible.slice(0, ROW_CHUNK).map(rowHtml).join('') : '<tr><td class="empty" colspan="5">No files match.</td></tr>';
+  let done = ROW_CHUNK;
+  const more = () => {
+    if (done >= visible.length) return;
+    el.filesBody.insertAdjacentHTML('beforeend', visible.slice(done, done + ROW_CHUNK).map(rowHtml).join(''));
+    done += ROW_CHUNK;
+    filesFrame = requestAnimationFrame(more);
+  };
+  filesFrame = requestAnimationFrame(more);
+  el.filesCount.textContent = `${fmt(visible.length)} of ${fmt(state.rows.length)} files`;
+  sortHeads.forEach(head => {
+    if (head.dataset.sort === key) head.setAttribute('aria-sort', direction === 1 ? 'ascending' : 'descending');
+    else head.removeAttribute('aria-sort');
+  });
+}
+
 function render() {
   if (!state.tree) return;
+  const list = state.view === 'list';
+  el.toolbar.hidden = list;
+  el.split.hidden = list;
+  el.files.hidden = !list;
+  el.views.querySelectorAll('[data-view]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.view === state.view)));
+  if (list) {
+    hideTip();
+    renderFiles();
+    if (state.focus) {
+      document.querySelector(state.focus)?.focus();
+      state.focus = null;
+    }
+    return;
+  }
   const zoomNode = state.tree.index.get(state.zoom) ?? state.tree.root;
   renderTabs(zoomNode);
   renderFilters(zoomNode);
@@ -627,8 +697,34 @@ el.panel.addEventListener('click', event => {
   if (node) go({zoom: node.parent.path, selected: node.path}, `[data-id="${CSS.escape(node.path)}"]`);
 });
 
+el.views.addEventListener('click', event => {
+  const button = event.target.closest('[data-view]');
+  if (button && button.dataset.view !== state.view) go({view: button.dataset.view}, `[data-view="${button.dataset.view}"]`);
+});
+
+el.files.querySelector('thead').addEventListener('click', event => {
+  const head = event.target.closest('th[data-sort]');
+  if (!head) return;
+  const key = head.dataset.sort;
+  state.sort = {key, direction: state.sort.key === key ? -state.sort.direction : 1};
+  renderFiles();
+});
+
+el.filesBody.addEventListener('click', event => {
+  const link = event.target.closest('[data-open]');
+  if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const node = state.tree.index.get(link.dataset.open);
+  if (!node) return;
+  event.preventDefault();
+  go({view: 'treemap', zoom: node.parent.path, selected: node.path}, `[data-id="${CSS.escape(node.path)}"]`);
+});
+
 el.search.addEventListener('input', () => {
   state.query = el.search.value;
+  if (state.view === 'list') {
+    renderFiles();
+    return;
+  }
   const zoomNode = state.tree.index.get(state.zoom) ?? state.tree.root;
   renderMap(zoomNode);
 });
