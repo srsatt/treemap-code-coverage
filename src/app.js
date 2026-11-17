@@ -20,7 +20,7 @@ const el = {
   theme: $('theme'), dialog: $('source'), sourceTitle: $('source-title'), sourceStats: $('source-stats'),
   sourceBlocks: $('source-blocks'), prevMiss: $('prev-miss'), nextMiss: $('next-miss'), sourceClose: $('source-close'),
   codeScroll: $('code-scroll'), gutter: $('gutter'), code: $('code'),
-  views: $('views'), toolbar: $('toolbar'), split: $('split'), files: $('files'), filesCount: $('files-count'), filesBody: $('files-body'),
+  views: $('views'), toolbar: $('toolbar'), mapPane: $('map-pane'), expandAll: $('expand-all'), collapseAll: $('collapse-all'), files: $('files'), filesCount: $('files-count'), filesBody: $('files-body'),
 };
 const sortHeads = [...el.files.querySelectorAll('th[data-sort]')];
 
@@ -32,6 +32,7 @@ const state = {
   metric: 'ln',
   view: 'treemap',
   rows: [],
+  expanded: new Set(),
   sort: {key: 'ln', direction: 1},
   zoom: '',
   selected: '',
@@ -63,6 +64,14 @@ function leaves(node, out = []) {
   if (node.children) node.children.forEach(child => leaves(child, out));
   else out.push(node);
   return out;
+}
+
+function folders() {
+  return [...state.tree.index.values()].filter(node => node.children && node.parent).map(node => node.path);
+}
+
+function panelNode() {
+  return state.view === 'list' ? state.tree.root : (state.tree.index.get(state.zoom) ?? state.tree.root);
 }
 
 function weightOf(node) {
@@ -103,7 +112,8 @@ function load(json, fileName) {
   el.search.hidden = false;
   el.views.hidden = false;
   const root = state.tree.root;
-  state.rows = leaves(root).map(node => ({node, lower: node.path.toLowerCase(), cells: fileCells(node)}));
+  state.rows = leaves(root).map(node => ({node, lower: node.path.toLowerCase()}));
+  state.expanded = new Set(state.rows.length <= 200 ? folders() : []);
   el.meta.textContent = `${fileName} · ${fmt(root.fileCount)} files${report.hasDetail ? '' : ' · summary only'}`;
   readHash();
   render();
@@ -128,14 +138,14 @@ async function loadSourceIndex() {
   state.sources = new Set();
   if (embeddedSources) {
     state.sources = new Set(Object.keys(embeddedSources));
-    renderPanel(tree.index.get(state.zoom) ?? tree.root);
+    renderPanel(panelNode());
     return;
   }
   try {
     const response = await fetch('sources/_index.json');
     if (response.ok && state.tree === tree) state.sources = new Set(await response.json());
   } catch {}
-  if (state.tree === tree) renderPanel(tree.index.get(state.zoom) ?? tree.root);
+  if (state.tree === tree) renderPanel(panelNode());
 }
 
 async function loadFile(file) {
@@ -198,6 +208,7 @@ function readHash() {
   const selected = params.get('s') ?? '';
   state.zoom = index?.get(zoom)?.children ? zoom : '';
   state.selected = index?.has(selected) ? selected : '';
+  for (let node = index?.get(state.selected)?.parent; node; node = node.parent) state.expanded.add(node.path);
 }
 
 function hashOf(next) {
@@ -335,9 +346,10 @@ function renderPanel(zoomNode) {
   );
   html.push(`<div><h3>All metrics</h3><div class="rows">${METRICS.map(({key: k, label}) => metricRow(node, k, label, k === key)).join('')}</div></div>`);
 
-  if (!node.children && state.sources.has(node.path)) {
-    html.push(`<div class="actions"><button type="button" class="btn" data-source="${escapeHtml(node.path)}">View source</button></div>`);
-  }
+  const actions = [];
+  if (state.view === 'list' && node.parent) actions.push(`<button type="button" class="btn" data-treemap="${escapeHtml(node.path)}">Show in treemap</button>`);
+  if (!node.children && state.sources.has(node.path)) actions.push(`<button type="button" class="btn" data-source="${escapeHtml(node.path)}">View source</button>`);
+  if (actions.length) html.push(`<div class="actions">${actions.join('')}</div>`);
 
   if (node.children) {
     const gaps = leaves(node)
@@ -377,33 +389,70 @@ function fileCells(node) {
 }
 
 function sortValue(node, key) {
-  return key === 'file' ? node.path : (percent(node.metrics[key]) ?? 100);
+  return key === 'name' ? node.name : (percent(node.metrics[key]) ?? 100);
 }
 
 const ROW_CHUNK = 250;
 let filesFrame = 0;
 
-function renderFiles() {
+const TWISTY = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 1.5 6.5 5 3 8.5"/></svg>';
+
+function collectRows(node, depth, query, out) {
+  const {key, direction} = state.sort;
+  const children = [...node.children].sort((a, b) => {
+    if (Boolean(a.children) !== Boolean(b.children)) return a.children ? -1 : 1;
+    const [left, right] = [sortValue(a, key === 'file' ? 'name' : key), sortValue(b, key === 'file' ? 'name' : key)];
+    return (left < right ? -1 : left > right ? 1 : a.name.localeCompare(b.name)) * direction;
+  });
+  let matched = 0;
+  for (const child of children) {
+    if (!child.children) {
+      if (!query || child.path.toLowerCase().includes(query)) {
+        out.push({node: child, depth});
+        matched++;
+      }
+      continue;
+    }
+    const at = out.length;
+    out.push({node: child, depth});
+    const inner = query || state.expanded.has(child.path) ? collectRows(child, depth + 1, query, out) : 0;
+    if (query && inner === 0) out.length = at;
+    else matched += inner;
+  }
+  return matched;
+}
+
+function rowHtml({node, depth}) {
+  const selected = node.path === state.selected;
+  const href = `#${escapeHtml(hashOf({selected: node.path}))}`;
+  const path = escapeHtml(node.path);
+  const cells = (node.cells ??= fileCells(node));
+  const label = `<a href="${href}" data-select="${path}" title="${path}"${selected ? ' aria-current="true"' : ''}>${escapeHtml(node.name)}</a>`;
+  if (!node.children) {
+    return `<tr${selected ? ' class="selected"' : ''}><td class="file" style="--depth:${depth}"><span class="twisty"></span>${label}</td>${cells}</tr>`;
+  }
+  const open = state.expanded.has(node.path);
+  return `<tr class="dir${selected ? ' selected' : ''}"><td class="file" style="--depth:${depth}"><button type="button" class="twisty" data-toggle="${path}" aria-expanded="${open}" aria-label="${open ? 'Collapse' : 'Expand'} ${escapeHtml(node.name)}">${TWISTY}</button>${label}<span class="n">${fmt(node.fileCount)}</span></td>${cells}</tr>`;
+}
+
+function renderFiles(sync = false) {
   const {key, direction} = state.sort;
   const query = state.query.trim().toLowerCase();
-  const visible = state.rows.filter(row => row.lower.includes(query));
-  visible.sort((a, b) => {
-    const [left, right] = [sortValue(a.node, key), sortValue(b.node, key)];
-    return (left < right ? -1 : left > right ? 1 : a.node.path.localeCompare(b.node.path)) * direction;
-  });
+  const rows = [];
+  collectRows(state.tree.root, 0, query, rows);
+  const matched = query ? state.rows.filter(row => row.lower.includes(query)).length : state.rows.length;
   cancelAnimationFrame(filesFrame);
-  const rowHtml = ({node, cells}) =>
-    `<tr><td class="file"><a href="#${escapeHtml(hashOf({view: 'treemap', zoom: node.parent.path, selected: node.path}))}" data-open="${escapeHtml(node.path)}">${escapeHtml(node.path)}</a></td>${cells}</tr>`;
-  el.filesBody.innerHTML = visible.length ? visible.slice(0, ROW_CHUNK).map(rowHtml).join('') : '<tr><td class="empty" colspan="5">No files match.</td></tr>';
-  let done = ROW_CHUNK;
+  const first = sync ? rows.length : ROW_CHUNK;
+  el.filesBody.innerHTML = rows.length ? rows.slice(0, first).map(rowHtml).join('') : '<tr><td class="empty" colspan="5">No files match.</td></tr>';
+  let done = first;
   const more = () => {
-    if (done >= visible.length) return;
-    el.filesBody.insertAdjacentHTML('beforeend', visible.slice(done, done + ROW_CHUNK).map(rowHtml).join(''));
+    if (done >= rows.length) return;
+    el.filesBody.insertAdjacentHTML('beforeend', rows.slice(done, done + ROW_CHUNK).map(rowHtml).join(''));
     done += ROW_CHUNK;
     filesFrame = requestAnimationFrame(more);
   };
   filesFrame = requestAnimationFrame(more);
-  el.filesCount.textContent = `${fmt(visible.length)} of ${fmt(state.rows.length)} files`;
+  el.filesCount.textContent = `${fmt(matched)} of ${fmt(state.rows.length)} files`;
   sortHeads.forEach(head => {
     if (head.dataset.sort === key) head.setAttribute('aria-sort', direction === 1 ? 'ascending' : 'descending');
     else head.removeAttribute('aria-sort');
@@ -414,12 +463,13 @@ function render() {
   if (!state.tree) return;
   const list = state.view === 'list';
   el.toolbar.hidden = list;
-  el.split.hidden = list;
+  el.mapPane.hidden = list;
   el.files.hidden = !list;
   el.views.querySelectorAll('[data-view]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.view === state.view)));
   if (list) {
     hideTip();
-    renderFiles();
+    renderFiles(Boolean(state.focus));
+    renderPanel(state.tree.root);
     if (state.focus) {
       document.querySelector(state.focus)?.focus();
       state.focus = null;
@@ -691,10 +741,17 @@ el.panel.addEventListener('click', event => {
     if (node) openSource(node);
     return;
   }
+  const open = event.target.closest('[data-treemap]');
+  if (open) {
+    const node = state.tree.index.get(open.dataset.treemap);
+    if (node) go(node.children ? {view: 'treemap', zoom: node.path, selected: ''} : {view: 'treemap', zoom: node.parent.path, selected: node.path}, 'first');
+    return;
+  }
   const button = event.target.closest('[data-pick]');
   if (!button) return;
   const node = state.tree.index.get(button.dataset.pick);
-  if (node) go({zoom: node.parent.path, selected: node.path}, `[data-id="${CSS.escape(node.path)}"]`);
+  if (node && state.view === 'list') go({selected: node.path}, `[data-select="${CSS.escape(node.path)}"]`);
+  else if (node) go({zoom: node.parent.path, selected: node.path}, `[data-id="${CSS.escape(node.path)}"]`);
 });
 
 el.views.addEventListener('click', event => {
@@ -711,12 +768,28 @@ el.files.querySelector('thead').addEventListener('click', event => {
 });
 
 el.filesBody.addEventListener('click', event => {
-  const link = event.target.closest('[data-open]');
+  const toggle = event.target.closest('[data-toggle]');
+  if (toggle) {
+    const path = toggle.dataset.toggle;
+    if (!state.expanded.delete(path)) state.expanded.add(path);
+    renderFiles(true);
+    el.filesBody.querySelector(`[data-toggle="${CSS.escape(path)}"]`)?.focus();
+    return;
+  }
+  const link = event.target.closest('[data-select]');
   if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-  const node = state.tree.index.get(link.dataset.open);
-  if (!node) return;
   event.preventDefault();
-  go({view: 'treemap', zoom: node.parent.path, selected: node.path}, `[data-id="${CSS.escape(node.path)}"]`);
+  go({selected: link.dataset.select}, `[data-select="${CSS.escape(link.dataset.select)}"]`);
+});
+
+el.expandAll.addEventListener('click', () => {
+  state.expanded = new Set(folders());
+  renderFiles(true);
+});
+
+el.collapseAll.addEventListener('click', () => {
+  state.expanded.clear();
+  renderFiles(true);
 });
 
 el.search.addEventListener('input', () => {

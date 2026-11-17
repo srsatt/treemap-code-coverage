@@ -45,11 +45,11 @@ The file holds the viewer, the report and the highlighted sources, and makes no 
 ### Views
 
 - **Treemap** (default): tiles sized by lines, folders zoom in, the side panel shows the selected file or folder.
-- **List**: a table with one row per file and a bar, percentage and covered/total for Statements, Branches, Functions and Lines. Bars use the same thresholds as the treemap legend (High ≥ 80%, Medium, Low < 50%). It works with `coverage-summary.json` and needs no sources.
+- **List**: the files as a folder tree. Folder rows are highlighted and carry the totals of everything below them; each row has a bar, percentage and covered/total for Statements, Branches, Functions and Lines. Bars use the same thresholds as the treemap legend (High ≥ 80%, Medium, Low < 50%). It works with `coverage-summary.json` and needs no sources.
 
-In the list, click a header to sort by it and click again to reverse; the default is Lines ascending, so the least covered files come first. The header filter box matches the file path and the count reads "N of M files". Opening a row switches to the treemap with that file selected, where **View source** is offered when sources are available.
+In the list, use the arrows to expand or collapse a folder, or **Expand all** / **Collapse all**. Click a header to sort by it (within each folder) and click again to reverse; the default is Lines ascending, so the least covered files come first. The header filter box matches the file path, keeps the folders above the matches open and the count reads "N of M files". Clicking a file or folder shows the same side panel as in the treemap, with **View source** when sources are available and **Show in treemap** to jump to it on the map.
 
-The view is kept in the URL hash (`#v=list`), so a link to the list can be shared and the back button returns to it. Opening a file uses `#z=<folder>&s=<file>`.
+The view and the selection are kept in the URL hash (`#v=list&s=<path>`), so a link to the list can be shared and the back button returns to it. **Show in treemap** uses `#z=<folder>&s=<file>`.
 
 ### Source preview
 
@@ -61,7 +61,7 @@ Open it by double-clicking a file, by pressing Enter on a selected file, or with
 
 - Tab enters the map; arrow keys move between tiles by position.
 - Enter opens a folder or selects a file; Enter on a selected file opens its source. Backspace goes up one folder.
-- In the list, column headers are buttons and each file is a link; Tab to a file and press Enter to open it.
+- In the list, column headers are buttons and each file is a link; Tab to a file or folder and press Enter to select it. Each folder has its own expand/collapse button.
 
 ### Theme
 

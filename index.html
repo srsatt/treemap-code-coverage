@@ -51,29 +51,33 @@ try {
     <div id="filters" class="filters" role="group" aria-label="Show files by coverage"></div>
   </div>
   <div id="split" class="split">
-    <section class="map-pane" aria-label="Coverage map">
+    <section id="map-pane" class="map-pane" aria-label="Coverage map">
       <nav id="crumbs" class="crumbs" aria-label="Folder"></nav>
       <div class="map-wrap"><div id="map" class="map" translate="no"></div></div>
     </section>
+    <section id="files" class="files-view" aria-label="Files" hidden>
+      <div class="files-bar">
+        <button id="expand-all" class="btn" type="button">Expand all</button>
+        <button id="collapse-all" class="btn" type="button">Collapse all</button>
+        <span id="files-count" class="meta" aria-live="polite"></span>
+      </div>
+      <div class="files-scroll">
+        <table class="files">
+          <thead>
+            <tr>
+              <th scope="col" data-sort="file"><button type="button" class="sort">File</button></th>
+              <th scope="col" data-sort="st"><button type="button" class="sort">Statements</button></th>
+              <th scope="col" data-sort="br"><button type="button" class="sort">Branches</button></th>
+              <th scope="col" data-sort="fn"><button type="button" class="sort">Functions</button></th>
+              <th scope="col" data-sort="ln"><button type="button" class="sort">Lines</button></th>
+            </tr>
+          </thead>
+          <tbody id="files-body"></tbody>
+        </table>
+      </div>
+    </section>
     <aside id="panel" class="panel" aria-label="Details" aria-live="polite"></aside>
   </div>
-  <section id="files" class="files-view" aria-label="Files" hidden>
-    <div class="files-bar"><span id="files-count" class="meta" aria-live="polite"></span></div>
-    <div class="files-scroll">
-      <table class="files">
-        <thead>
-          <tr>
-            <th scope="col" data-sort="file"><button type="button" class="sort">File</button></th>
-            <th scope="col" data-sort="st"><button type="button" class="sort">Statements</button></th>
-            <th scope="col" data-sort="br"><button type="button" class="sort">Branches</button></th>
-            <th scope="col" data-sort="fn"><button type="button" class="sort">Functions</button></th>
-            <th scope="col" data-sort="ln"><button type="button" class="sort">Lines</button></th>
-          </tr>
-        </thead>
-        <tbody id="files-body"></tbody>
-      </table>
-    </div>
-  </section>
 </main>
 
 <dialog id="source" class="source" aria-labelledby="source-title">
