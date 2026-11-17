@@ -61,7 +61,7 @@ Open it by double-clicking a file, by pressing Enter on a selected file, or with
 
 - Tab enters the map; arrow keys move between tiles by position.
 - Enter opens a folder or selects a file; Enter on a selected file opens its source. Backspace goes up one folder.
-- In the list, column headers are buttons and each file is a link; Tab to a file or folder and press Enter to select it. Each folder has its own expand/collapse button.
+- In the list, Tab enters the table once and column headers are buttons. Up/Down (Home/End) move between rows, Right expands a folder or steps into it, Left collapses it or goes to the parent. Space selects the row and shows it in the side panel; Enter opens the source preview of a file (or toggles a folder).
 
 ### Theme
 

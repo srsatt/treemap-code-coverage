@@ -422,17 +422,19 @@ function collectRows(node, depth, query, out) {
   return matched;
 }
 
+let tabStop = '';
+
 function rowHtml({node, depth}) {
   const selected = node.path === state.selected;
   const href = `#${escapeHtml(hashOf({selected: node.path}))}`;
   const path = escapeHtml(node.path);
   const cells = (node.cells ??= fileCells(node));
-  const label = `<a href="${href}" data-select="${path}" title="${path}"${selected ? ' aria-current="true"' : ''}>${escapeHtml(node.name)}</a>`;
+  const label = `<a href="${href}" data-select="${path}" title="${path}" tabindex="${node.path === tabStop ? 0 : -1}"${selected ? ' aria-current="true"' : ''}>${escapeHtml(node.name)}</a>`;
   if (!node.children) {
     return `<tr${selected ? ' class="selected"' : ''}><td class="file" style="--depth:${depth}"><span class="twisty"></span>${label}</td>${cells}</tr>`;
   }
   const open = state.expanded.has(node.path);
-  return `<tr class="dir${selected ? ' selected' : ''}"><td class="file" style="--depth:${depth}"><button type="button" class="twisty" data-toggle="${path}" aria-expanded="${open}" aria-label="${open ? 'Collapse' : 'Expand'} ${escapeHtml(node.name)}">${TWISTY}</button>${label}<span class="n">${fmt(node.fileCount)} ${node.fileCount === 1 ? 'file' : 'files'}</span></td>${cells}</tr>`;
+  return `<tr class="dir${selected ? ' selected' : ''}"><td class="file" style="--depth:${depth}"><button type="button" class="twisty" tabindex="-1" data-toggle="${path}" aria-expanded="${open}" aria-label="${open ? 'Collapse' : 'Expand'} ${escapeHtml(node.name)}">${TWISTY}</button>${label}<span class="n">${fmt(node.fileCount)} ${node.fileCount === 1 ? 'file' : 'files'}</span></td>${cells}</tr>`;
 }
 
 function renderFiles(sync = false) {
@@ -440,6 +442,7 @@ function renderFiles(sync = false) {
   const query = state.query.trim().toLowerCase();
   const rows = [];
   collectRows(state.tree.root, 0, query, rows);
+  tabStop = rows.some(row => row.node.path === state.selected) ? state.selected : (rows[0]?.node.path ?? '');
   const matched = query ? state.rows.filter(row => row.lower.includes(query)).length : state.rows.length;
   cancelAnimationFrame(filesFrame);
   const first = sync ? rows.length : ROW_CHUNK;
@@ -647,7 +650,9 @@ el.dialog.addEventListener('close', () => {
   el.gutter.innerHTML = '';
   const node = state.sourceNode;
   state.sourceNode = null;
-  if (node) el.map.querySelector(`[data-id="${CSS.escape(node.path)}"]`)?.focus();
+  if (!node) return;
+  if (state.view === 'list') el.filesBody.querySelector(`[data-select="${CSS.escape(node.path)}"]`)?.focus();
+  else el.map.querySelector(`[data-id="${CSS.escape(node.path)}"]`)?.focus();
 });
 el.dialog.addEventListener('click', event => {
   if (event.target === el.dialog) el.dialog.close();
@@ -780,6 +785,64 @@ el.filesBody.addEventListener('click', event => {
   if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   event.preventDefault();
   go({selected: link.dataset.select}, `[data-select="${CSS.escape(link.dataset.select)}"]`);
+});
+
+function focusRow(link) {
+  el.filesBody.querySelectorAll('[data-select][tabindex="0"]').forEach(n => (n.tabIndex = -1));
+  link.tabIndex = 0;
+  link.focus();
+  link.scrollIntoView({block: 'nearest'});
+}
+
+function setExpanded(path, open) {
+  if (state.expanded.has(path) === open) return;
+  if (open) state.expanded.add(path);
+  else state.expanded.delete(path);
+  renderFiles(true);
+  el.filesBody.querySelector(`[data-select="${CSS.escape(path)}"]`)?.focus();
+}
+
+el.filesBody.addEventListener('keydown', event => {
+  if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  const link = event.target.closest('[data-select]');
+  if (!link) return;
+  const node = state.tree.index.get(link.dataset.select);
+  if (!node) return;
+  const links = [...el.filesBody.querySelectorAll('[data-select]')];
+  const at = links.indexOf(link);
+  const move = target => {
+    event.preventDefault();
+    if (target) focusRow(target);
+  };
+  switch (event.key) {
+    case 'ArrowDown': return move(links[at + 1]);
+    case 'ArrowUp': return move(links[at - 1]);
+    case 'Home': return move(links[0]);
+    case 'End': return move(links.at(-1));
+    case 'ArrowRight':
+      event.preventDefault();
+      if (node.children && !state.expanded.has(node.path)) setExpanded(node.path, true);
+      else if (node.children) focusRow(links[at + 1]);
+      return;
+    case 'ArrowLeft':
+      event.preventDefault();
+      if (node.children && state.expanded.has(node.path) && !state.query.trim()) setExpanded(node.path, false);
+      else if (node.parent?.parent) focusRow(el.filesBody.querySelector(`[data-select="${CSS.escape(node.parent.path)}"]`) ?? link);
+      return;
+    case ' ':
+      event.preventDefault();
+      go({selected: node.path}, `[data-select="${CSS.escape(node.path)}"]`);
+      return;
+    case 'Enter':
+      event.preventDefault();
+      if (node.children) {
+        if (!state.query.trim()) setExpanded(node.path, !state.expanded.has(node.path));
+        return;
+      }
+      go({selected: node.path}, `[data-select="${CSS.escape(node.path)}"]`);
+      if (state.sources.has(node.path)) openSource(node);
+      return;
+  }
 });
 
 el.expandAll.addEventListener('click', () => {
