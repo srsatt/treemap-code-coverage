@@ -432,7 +432,7 @@ function rowHtml({node, depth}) {
     return `<tr${selected ? ' class="selected"' : ''}><td class="file" style="--depth:${depth}"><span class="twisty"></span>${label}</td>${cells}</tr>`;
   }
   const open = state.expanded.has(node.path);
-  return `<tr class="dir${selected ? ' selected' : ''}"><td class="file" style="--depth:${depth}"><button type="button" class="twisty" data-toggle="${path}" aria-expanded="${open}" aria-label="${open ? 'Collapse' : 'Expand'} ${escapeHtml(node.name)}">${TWISTY}</button>${label}<span class="n">${fmt(node.fileCount)}</span></td>${cells}</tr>`;
+  return `<tr class="dir${selected ? ' selected' : ''}"><td class="file" style="--depth:${depth}"><button type="button" class="twisty" data-toggle="${path}" aria-expanded="${open}" aria-label="${open ? 'Collapse' : 'Expand'} ${escapeHtml(node.name)}">${TWISTY}</button>${label}<span class="n">${fmt(node.fileCount)} ${node.fileCount === 1 ? 'file' : 'files'}</span></td>${cells}</tr>`;
 }
 
 function renderFiles(sync = false) {
