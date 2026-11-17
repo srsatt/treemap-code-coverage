@@ -117,6 +117,7 @@ function load(json, fileName) {
   el.meta.textContent = `${fileName} · ${fmt(root.fileCount)} files${report.hasDetail ? '' : ' · summary only'}`;
   readHash();
   render();
+  if (state.view === 'list') el.filesBody.querySelector('[aria-current]')?.scrollIntoView({block: 'center'});
   loadSourceIndex();
 }
 
@@ -389,7 +390,7 @@ function fileCells(node) {
 }
 
 function sortValue(node, key) {
-  return key === 'name' ? node.name : (percent(node.metrics[key]) ?? 100);
+  return percent(node.metrics[key]) ?? 100;
 }
 
 const ROW_CHUNK = 250;
@@ -401,7 +402,8 @@ function collectRows(node, depth, query, out) {
   const {key, direction} = state.sort;
   const children = [...node.children].sort((a, b) => {
     if (Boolean(a.children) !== Boolean(b.children)) return a.children ? -1 : 1;
-    const [left, right] = [sortValue(a, key === 'file' ? 'name' : key), sortValue(b, key === 'file' ? 'name' : key)];
+    if (key === 'file') return a.name.localeCompare(b.name) * direction;
+    const [left, right] = [sortValue(a, key), sortValue(b, key)];
     return (left < right ? -1 : left > right ? 1 : a.name.localeCompare(b.name)) * direction;
   });
   let matched = 0;
@@ -423,6 +425,7 @@ function collectRows(node, depth, query, out) {
 }
 
 let tabStop = '';
+let filtering = false;
 
 function rowHtml({node, depth}) {
   const selected = node.path === state.selected;
@@ -433,7 +436,7 @@ function rowHtml({node, depth}) {
   if (!node.children) {
     return `<tr${selected ? ' class="selected"' : ''}><td class="file" style="--depth:${depth}"><span class="twisty"></span>${label}</td>${cells}</tr>`;
   }
-  const open = state.expanded.has(node.path);
+  const open = filtering || state.expanded.has(node.path);
   return `<tr class="dir${selected ? ' selected' : ''}"><td class="file" style="--depth:${depth}"><button type="button" class="twisty" tabindex="-1" data-toggle="${path}" aria-expanded="${open}" aria-label="${open ? 'Collapse' : 'Expand'} ${escapeHtml(node.name)}">${TWISTY}</button>${label}<span class="n">${fmt(node.fileCount)} ${node.fileCount === 1 ? 'file' : 'files'}</span></td>${cells}</tr>`;
 }
 
@@ -445,7 +448,9 @@ function renderFiles(sync = false) {
   tabStop = rows.some(row => row.node.path === state.selected) ? state.selected : (rows[0]?.node.path ?? '');
   const matched = query ? state.rows.filter(row => row.lower.includes(query)).length : state.rows.length;
   cancelAnimationFrame(filesFrame);
-  const first = sync ? rows.length : ROW_CHUNK;
+  filtering = Boolean(query);
+  const selectedAt = rows.findIndex(row => row.node.path === state.selected);
+  const first = sync ? rows.length : Math.max(ROW_CHUNK, selectedAt + 1);
   el.filesBody.innerHTML = rows.length ? rows.slice(0, first).map(rowHtml).join('') : '<tr><td class="empty" colspan="5">No files match.</td></tr>';
   let done = first;
   const more = () => {
@@ -479,6 +484,7 @@ function render() {
     }
     return;
   }
+  cancelAnimationFrame(filesFrame);
   const zoomNode = state.tree.index.get(state.zoom) ?? state.tree.root;
   renderTabs(zoomNode);
   renderFilters(zoomNode);
@@ -775,6 +781,7 @@ el.files.querySelector('thead').addEventListener('click', event => {
 el.filesBody.addEventListener('click', event => {
   const toggle = event.target.closest('[data-toggle]');
   if (toggle) {
+    if (filtering) return;
     const path = toggle.dataset.toggle;
     if (!state.expanded.delete(path)) state.expanded.add(path);
     renderFiles(true);
@@ -821,7 +828,7 @@ el.filesBody.addEventListener('keydown', event => {
     case 'End': return move(links.at(-1));
     case 'ArrowRight':
       event.preventDefault();
-      if (node.children && !state.expanded.has(node.path)) setExpanded(node.path, true);
+      if (node.children && !filtering && !state.expanded.has(node.path)) setExpanded(node.path, true);
       else if (node.children) focusRow(links[at + 1]);
       return;
     case 'ArrowLeft':
